@@ -6,7 +6,7 @@ terraform {
     }
   }
   cloud { 
-    organization = "hackathon-learn" 
+    organization = "hackathon-learnvk" 
     workspaces { 
       name = "hackathon-learn-azure" 
     } 
