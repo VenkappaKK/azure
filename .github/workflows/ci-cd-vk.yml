@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+- name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+- name: Terraform Init
+      working-directory: aks
+      run: terraform init -backend-config="storage_account_name=terraformstorage" -backend-config="container_name=tfstate" -backend-config="key=aks-prod.tfstate"
+      
+    - name: Terraform Format
+      working-directory: aks
+      run: terraform fmt
+- name: Terraform Plan
+      working-directory: aks
+      run: terraform plan
+- name: Terraform Apply
+      working-directory: aks
+      run: terraform apply -auto-approve
+build-deploy:
+    needs: terraform
+    runs-on: ubuntu-latest
+steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+- name: Build and Push Docker Image
+      env:
+        ACR_NAME: ${{ secrets.ACR_NAME }}
+      run: |
+        az acr login --name $ACR_NAME
+        docker build -t $ACR_NAME.azurecr.io/myapp:latest .
+        docker push $ACR_NAME.azurecr.io/myapp:latest
+- name: Deploy to AKS
+      env:
+        KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      run: |
+        kubectl apply -f k8s/deployment.yml
